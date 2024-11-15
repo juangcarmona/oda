@@ -39,7 +39,7 @@ sudo apt update && sudo apt upgrade -y
 
 # Install essential build tools
 status "Installing build essentials..."
-sudo apt install -y build-essential git curl wget software-properties-common
+sudo apt install -y build-essential git curl wget software-properties-common cmake
 
 # Install Python and pip
 status "Setting up Python environment..."
@@ -72,6 +72,18 @@ status "Setting up ZSH..."
 sudo apt install -y zsh
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 chsh -s $(which zsh)
+
+# Install llama.cpp
+status "Installing llama.cpp..."
+cd /tmp
+git clone https://github.com/ggerganov/llama.cpp.git
+cd llama.cpp
+mkdir build && cd build
+cmake .. -DLLAMA_CUBLAS=ON
+cmake --build . --config Release
+sudo cp bin/main /usr/local/bin/llama
+cd ../..
+rm -rf llama.cpp
 
 # Final message
 echo -e "${GREEN}"

@@ -29,6 +29,7 @@ curl -sSL https://raw.githubusercontent.com/mitkox/oda/main/oda.sh | bash
 - System essentials (git, curl, build tools)
 - Python development environment
 - Common AI/ML libraries (PyTorch, TensorFlow, etc.)
+- llama.cpp with CUDA support
 - Docker and NVIDIA Container Toolkit
 - Development tools (VS Code, etc.)
 - Shell improvements (zsh, oh-my-zsh)
