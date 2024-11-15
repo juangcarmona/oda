@@ -19,7 +19,7 @@ ODA is a comprehensive setup script that transforms a fresh Ubuntu installation 
 ## Quick Start
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/yourusername/oda/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/mitkox/oda/main/install.sh | bash
 ```
 
 ## What Gets Installed
