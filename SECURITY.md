@@ -6,7 +6,7 @@ We release patches for security vulnerabilities. The following versions are curr
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
+| 0.0.1   | :white_check_mark: |
 
 ## Security Considerations
 
