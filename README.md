@@ -100,6 +100,42 @@ source ~/.oda-venv/bin/activate
 - Principle of least privilege
 - Comprehensive error checking
 
+### On-Device AI Development Tools
+
+#### Model Serving and Inference
+- NVIDIA Triton Inference Server ${TRITON_VERSION}
+- TensorRT ${TENSORRT_VERSION}
+- ONNX Runtime with GPU support
+- TensorFlow Lite
+- OpenVINO
+- Apache TVM ${TVM_VERSION}
+
+#### Edge AI and Mobile
+- MediaPipe
+- Edge Impulse CLI
+- NCNN for mobile devices
+- ARM NN SDK (on ARM devices)
+- PyTorch Mobile
+- TensorFlow Lite
+
+#### Model Optimization
+- Neural Network Distiller
+- TensorFlow Model Optimization
+- Intel Neural Compressor
+- Torch2TRT
+- NVIDIA TensorRT
+
+#### Performance Tools
+- MLPerf for benchmarking
+- NVIDIA Nsight Systems
+- perf for profiling
+- CUDA Toolkit
+
+#### Additional Frameworks
+- PaddlePaddle Lite
+- MXNet
+- ARM Compute Library (on ARM)
+
 ## Installation Directory Structure
 
 ```

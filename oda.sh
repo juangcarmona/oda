@@ -11,6 +11,9 @@ readonly NUMPY_VERSION="1.24.3"
 readonly PANDAS_VERSION="2.1.1"
 readonly SCIKIT_VERSION="1.3.1"
 readonly NVIDIA_VERSION="535"
+readonly TENSORRT_VERSION="8.6.1"
+readonly TRITON_VERSION="2.40.0"
+readonly TVM_VERSION="0.15.0"
 
 # Global variables
 DISTRO=""
@@ -198,27 +201,62 @@ setup_python_environment() {
 }
 
 install_nvidia() {
-    if [ "$HAS_GPU" = true ]; then
-        log "Installing NVIDIA components..."
-        
-        case "$DISTRO" in
-            ubuntu)
-                # Add NVIDIA repository
-                wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
-                sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
-                sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
-                sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
-                sudo apt-get update
-                $INSTALL_CMD "nvidia-driver-${NVIDIA_VERSION}" cuda
-                ;;
-            redhat)
-                # Add NVIDIA repository
-                sudo dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
-                sudo dnf clean all
-                $INSTALL_CMD "kmod-nvidia-${NVIDIA_VERSION}" cuda
-                ;;
-        esac
+    if [ "$HAS_GPU" = false ]; then
+        return
     fi
+    
+    log "Installing NVIDIA components..."
+    
+    case "$DISTRO" in
+        ubuntu)
+            # Add NVIDIA repository
+            curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+            curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+                sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+                sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+            
+            $UPDATE_CMD
+            
+            # Install NVIDIA drivers and CUDA
+            $INSTALL_CMD nvidia-driver-$NVIDIA_VERSION cuda-toolkit
+            
+            # Install TensorRT
+            $INSTALL_CMD tensorrt
+            
+            # Install NVIDIA Container Toolkit
+            $INSTALL_CMD nvidia-container-toolkit
+            ;;
+            
+        redhat)
+            # Add NVIDIA repository
+            sudo dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
+            
+            # Install NVIDIA drivers and CUDA
+            $INSTALL_CMD nvidia-driver-$NVIDIA_VERSION cuda-toolkit
+            
+            # Install TensorRT
+            $INSTALL_CMD tensorrt
+            
+            # Install NVIDIA Container Toolkit
+            curl -s -L https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo | \
+                sudo tee /etc/yum.repos.d/nvidia-container-toolkit.repo
+            $INSTALL_CMD nvidia-container-toolkit
+            ;;
+    esac
+    
+    # Install NVIDIA Triton
+    sudo docker pull nvcr.io/nvidia/tritonserver:${TRITON_VERSION}-py3
+    sudo docker pull nvcr.io/nvidia/tritonserver:${TRITON_VERSION}-py3-sdk
+    
+    # Install NVIDIA Nsight Systems
+    case "$DISTRO" in
+        ubuntu)
+            $INSTALL_CMD nsight-systems
+            ;;
+        redhat)
+            $INSTALL_CMD nsight-systems
+            ;;
+    esac
 }
 
 setup_docker() {
@@ -297,6 +335,108 @@ setup_development_tools() {
     fi
 }
 
+setup_ai_tools() {
+    log "Setting up AI development tools..."
+    
+    # Activate virtual environment
+    source "$VENV_DIR/bin/activate"
+    
+    # Install TensorFlow Lite
+    pip install tensorflow-lite
+    
+    # Install ONNX and ONNX Runtime
+    pip install onnx onnxruntime-gpu
+    
+    # Install PyTorch Mobile
+    pip install torch torchvision torchaudio
+    
+    # Install TVM
+    git clone --recursive https://github.com/apache/tvm tvm
+    cd tvm
+    git checkout v${TVM_VERSION}
+    mkdir build
+    cp cmake/config.cmake build
+    cd build
+    if [ "$HAS_GPU" = true ]; then
+        echo "set(USE_CUDA ON)" >> config.cmake
+        echo "set(USE_CUDNN ON)" >> config.cmake
+    fi
+    cmake ..
+    make -j$(nproc)
+    cd python
+    pip install -e .
+    cd ../../
+    
+    # Install Edge Impulse CLI
+    npm install -g edge-impulse-cli
+    
+    # Install MediaPipe
+    pip install mediapipe
+    
+    # Install Neural Network Distiller
+    git clone https://github.com/IntelLabs/distiller.git
+    cd distiller
+    pip install -e .
+    cd ..
+    
+    # Install MLPerf
+    pip install mlperf-inference
+    
+    # Install additional optimization tools
+    pip install \
+        neural-compressor \
+        torch2trt \
+        tensorflow-model-optimization \
+        mxnet \
+        paddlepaddle-gpu \
+        tritonclient[all]
+    
+    # Install OpenVINO
+    case "$DISTRO" in
+        ubuntu)
+            wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+            sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+            echo "deb https://apt.repos.intel.com/openvino/2023 ubuntu22 main" | sudo tee /etc/apt/sources.list.d/intel-openvino-2023.list
+            $UPDATE_CMD
+            $INSTALL_CMD intel-openvino-dev-ubuntu22
+            ;;
+        redhat)
+            sudo dnf config-manager --add-repo https://yum.repos.intel.com/openvino/2023/setup/intel-openvino-2023.repo
+            $INSTALL_CMD intel-openvino-dev
+            ;;
+    esac
+    
+    # Install NCNN
+    git clone https://github.com/Tencent/ncnn.git
+    cd ncnn
+    mkdir build
+    cd build
+    if [ "$HAS_GPU" = true ]; then
+        cmake -DNCNN_VULKAN=ON ..
+    else
+        cmake ..
+    fi
+    make -j$(nproc)
+    sudo make install
+    cd ../..
+    
+    # Install ARM NN
+    if [ "$(uname -m)" = "aarch64" ]; then
+        git clone https://github.com/ARM-software/armnn.git
+        cd armnn
+        mkdir build
+        cd build
+        cmake .. \
+            -DARMCOMPUTE_ROOT=/usr/local/include \
+            -DARMCOMPUTE_BUILD_DIR=/usr/local/lib
+        make -j$(nproc)
+        sudo make install
+        cd ../..
+    fi
+    
+    deactivate
+}
+
 validate_system_requirements() {
     log "Validating system requirements..."
     
@@ -355,7 +495,7 @@ main() {
     echo -e "${BLUE}"
     echo "╔═══════════════════════════════════════════╗"
     echo "║               ODA Installer               ║"
-    echo "║     On Device AI Development Setup       ║"
+    echo "║     On Device AI Development Setup        ║"
     echo "╚═══════════════════════════════════════════╝"
     echo -e "${NC}"
     
@@ -389,6 +529,9 @@ main() {
     
     # Install development tools
     setup_development_tools
+    
+    # Setup AI tools
+    setup_ai_tools
     
     # Cleanup
     cleanup
