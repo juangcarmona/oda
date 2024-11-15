@@ -1,4 +1,4 @@
-# ODA (On Device AI) v0.1
+# ODA (On Device AI)
 
 Turn a fresh Ubuntu installation into a fully-configured, sleek, and modern on device AI development system by running a single command.
 
