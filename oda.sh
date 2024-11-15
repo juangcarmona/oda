@@ -333,6 +333,11 @@ setup_development_tools() {
     else
         make
     fi
+    
+    # Add llama.cpp to PATH
+    echo 'export PATH="$PATH:$HOME/.oda/llama.cpp"' >> "$HOME/.zshrc"
+    # Also add to .bashrc for compatibility
+    echo 'export PATH="$PATH:$HOME/.oda/llama.cpp"' >> "$HOME/.bashrc"
 }
 
 setup_ai_tools() {
