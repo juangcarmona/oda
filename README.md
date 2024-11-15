@@ -2,7 +2,7 @@
 
 Turn a fresh Ubuntu installation into a fully-configured, sleek, and modern on device AI development system by running a single command.
 
- Radicle: `rad://z2ELVemM12PrcCMfi7dQCTHfsWPNh`
+Radicle: `rad://z2ELVemM12PrcCMfi7dQCTHfsWPNh`
 
 ## Overview
 
@@ -12,11 +12,12 @@ ODA is a comprehensive setup script that transforms a fresh Ubuntu installation 
 
 - One-command setup
 - Essential development tools
-- Python environment with AI/ML libraries
+- Python environment with AI/ML libraries (version-pinned)
 - Docker configuration
 - GPU drivers and CUDA setup (if available)
 - Development environment configurations
 - Performance optimizations
+- Strict error handling and validation
 
 ## Quick Start
 
@@ -24,22 +25,50 @@ ODA is a comprehensive setup script that transforms a fresh Ubuntu installation 
 curl -sSL https://raw.githubusercontent.com/mitkox/oda/main/oda.sh | bash
 ```
 
+After installation, activate the Python virtual environment:
+```bash
+source ~/.oda-venv/bin/activate
+```
+
 ## What Gets Installed
 
 - System essentials (git, curl, build tools)
-- Python development environment
-- Common AI/ML libraries (PyTorch, TensorFlow, etc.)
-- llama.cpp with CUDA support
+- Python 3.10 with virtual environment
+- Version-pinned AI/ML libraries:
+  - PyTorch 2.1.0
+  - TensorFlow 2.14.0
+  - NumPy 1.24.3
+  - pandas 2.1.1
+  - scikit-learn 1.3.1
+- llama.cpp with CUDA support (when GPU available)
 - Docker and NVIDIA Container Toolkit
-- Development tools (VS Code, etc.)
+- Development tools (VS Code)
 - Shell improvements (zsh, oh-my-zsh)
-- GPU drivers and CUDA (if applicable)
+- NVIDIA driver 535 and CUDA (if GPU available)
 
 ## Requirements
 
 - Fresh Ubuntu installation (20.04 LTS or newer)
 - Internet connection
 - Sudo privileges
+- 20GB free disk space
+
+## Features
+
+### Error Handling
+- Strict error checking with detailed error messages
+- Disk space validation
+- System compatibility checks
+
+### Python Environment
+- Isolated virtual environment at `~/.oda-venv`
+- Version-pinned dependencies for stability
+- Pre-configured for AI/ML development
+
+### GPU Support
+- Automatic NVIDIA GPU detection
+- CUDA-enabled builds when GPU is available
+- Containerized GPU support with NVIDIA Docker
 
 ## Contributing
 
