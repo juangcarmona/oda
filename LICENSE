@@ -19,3 +19,16 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Third-Party Software Licenses:
+
+This project includes the following third-party software, which is subject to its own licenses:
+
+1. Python - PSF License
+2. Docker - Apache License 2.0
+3. NVIDIA CUDA Toolkit - NVIDIA CUDA Toolkit License Agreement
+4. Visual Studio Code - MIT License
+5. Oh My Zsh - MIT License
+6. llama.cpp - MIT License
+
+For the complete text of these licenses, please refer to the respective projects' websites or documentation.
