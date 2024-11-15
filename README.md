@@ -2,6 +2,8 @@
 
 Turn a fresh Ubuntu installation into a fully-configured, sleek, and modern on device AI development system by running a single command.
 
+🌱 Radicle: `rad://z2ELVemM12PrcCMfi7dQCTHfsWPNh`
+
 ## Overview
 
 ODA is a comprehensive setup script that transforms a fresh Ubuntu installation into a complete AI development environment. It automates the installation and configuration of essential tools, libraries, and environments commonly used in AI development.
