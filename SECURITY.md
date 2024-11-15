@@ -2,9 +2,11 @@
 
 ## Supported Versions
 
+We release patches for security vulnerabilities. The following versions are currently being supported with security updates:
+
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| 1.0.x   | :white_check_mark: |
 
 ## Security Considerations
 
@@ -31,54 +33,71 @@
 
 ## Reporting a Vulnerability
 
-We take security vulnerabilities seriously. Please follow these steps to report a vulnerability:
+We take the security of our project seriously. If you believe you have found a security vulnerability, please report it to us as described below.
 
-1. **Do Not** open a public GitHub issue for security vulnerabilities
-2. Send a detailed report to [sec@mitkox.com](mailto:sec@mitkox.com)
-3. Include:
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if available)
+**Please do not report security vulnerabilities through public GitHub issues.**
 
-### What to Expect
-- Acknowledgment of your report within 48 hours
-- Regular updates on the progress
-- Credit for responsible disclosure (if desired)
+Instead, please report them via email to [sec@mitkox.com](mailto:sec@mitkox.com).
 
-## Best Practices for Users
+You should receive a response within 48 hours. If for some reason you do not, please follow up via email to ensure we received your original message.
 
-1. **Before Installation**
+Please include the following information:
+
+* Type of issue (e.g. buffer overflow, SQL injection, cross-site scripting, etc.)
+* Full paths of source file(s) related to the manifestation of the issue
+* The location of the affected source code (tag/branch/commit or direct URL)
+* Any special configuration required to reproduce the issue
+* Step-by-step instructions to reproduce the issue
+* Proof-of-concept or exploit code (if possible)
+* Impact of the issue, including how an attacker might exploit it
+
+## Security Features
+
+Our project implements several security features to protect your system:
+
+1. **HTTPS-Only Downloads**: All package and script downloads use HTTPS
+2. **GPG Key Verification**: Package repositories are verified using GPG keys
+3. **Secure File Handling**: Temporary files are properly cleaned up
+4. **Principle of Least Privilege**: Operations requiring elevated privileges are minimized
+5. **No Root Installation**: The script prevents running as root for better security
+6. **Clean Environment**: Temporary files and caches are cleaned after installation
+7. **Access Control**: All installed components follow principle of least privilege
+8. **Network Security**: Downloads use HTTPS exclusively
+9. **Data Protection**: No sensitive data is collected
+
+## Best Practices
+
+When using our project, follow these security best practices:
+
+1. Always inspect scripts before running them
+2. Keep your system updated
+3. Use strong passwords for all services
+4. Follow the principle of least privilege
+5. Regularly monitor system logs
+6. Keep backups of important data
+7. **Before Installation**
    - Verify the script's content before execution
    - Check the installation URL matches the official repository
    - Ensure you're on a supported Ubuntu version
 
-2. **During Installation**
+8. **During Installation**
    - Review sudo commands before entering password
    - Monitor system modifications
    - Ensure adequate disk space (20GB minimum)
 
-3. **Post Installation**
+9. **Post Installation**
    - Keep the system updated
    - Regularly update AI/ML libraries
    - Monitor GPU resource usage
 
-## Security Features
+## Disclosure Policy
 
-### Access Control
-- All installed components follow principle of least privilege
-- Docker containers run with restricted capabilities
-- GPU access is properly sandboxed
+When we receive a security bug report, we will:
 
-### Network Security
-- Downloads use HTTPS exclusively
-- Package signatures are verified
-- Container network access can be restricted
-
-### Data Protection
-- No sensitive data is collected
-- Installation logs are stored locally
-- Virtual environment isolates dependencies
+1. Confirm the problem and determine the affected versions
+2. Audit code to find any potential similar problems
+3. Prepare fixes for all supported versions
+4. Release new versions as soon as possible
 
 ## Dependency Security
 
