@@ -2,7 +2,7 @@
 
 Turn a fresh Ubuntu installation into a fully-configured, sleek, and modern on device AI development system by running a single command.
 
-🌱 Radicle: `rad://z2ELVemM12PrcCMfi7dQCTHfsWPNh`
+ Radicle: `rad://z2ELVemM12PrcCMfi7dQCTHfsWPNh`
 
 ## Overview
 
@@ -10,18 +10,18 @@ ODA is a comprehensive setup script that transforms a fresh Ubuntu installation 
 
 ## Features
 
-- 🚀 One-command setup
-- 🛠️ Essential development tools
-- 🐍 Python environment with AI/ML libraries
-- 🐋 Docker configuration
-- 📊 GPU drivers and CUDA setup (if available)
-- 🔧 Development environment configurations
-- ⚡ Performance optimizations
+- One-command setup
+- Essential development tools
+- Python environment with AI/ML libraries
+- Docker configuration
+- GPU drivers and CUDA setup (if available)
+- Development environment configurations
+- Performance optimizations
 
 ## Quick Start
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/mitkox/oda/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/mitkox/oda/main/oda.sh | bash
 ```
 
 ## What Gets Installed
