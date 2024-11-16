@@ -11,7 +11,10 @@ ODA is a comprehensive setup script that transforms a fresh Linux installation i
 ## Features
 
 - One-command setup
-- Automatic distribution detection and configuration
+- Command-line options for flexible installation
+- Enhanced logging system with multiple levels
+- Automatic distribution detection and configuration (Ubuntu, Debian, RedHat, Fedora, CentOS)
+- Configuration backup and resume capability
 - Essential development tools
 - Python environment with AI/ML libraries (version-pinned)
 - Docker configuration
@@ -19,6 +22,7 @@ ODA is a comprehensive setup script that transforms a fresh Linux installation i
 - Development environment configurations
 - Performance optimizations
 - Strict error handling and validation
+- Version compatibility checks
 
 ## Quick Start
 
@@ -29,7 +33,36 @@ curl -sSL https://raw.githubusercontent.com/mitkox/oda/main/oda.sh | bash
 # Option 2: Download and inspect before running
 curl -O https://raw.githubusercontent.com/mitkox/oda/main/oda.sh
 chmod +x oda.sh
-./oda.sh
+./oda.sh [OPTIONS]
+```
+
+### Command-Line Options
+
+```bash
+Usage: ./oda.sh [OPTIONS]
+Options:
+  -y, --yes        Non-interactive mode, assume yes for all prompts
+  -d, --dry-run    Show what would be installed without making changes
+  -v, --verbose    Enable verbose logging
+  -h, --help       Show this help message
+  --no-gpu         Skip GPU-related installations
+  --resume         Resume from last failed step
+```
+
+### Examples
+
+```bash
+# Non-interactive installation
+./oda.sh -y
+
+# Verbose installation without GPU support
+./oda.sh -v --no-gpu
+
+# Resume a failed installation
+./oda.sh --resume
+
+# Show what would be installed without making changes
+./oda.sh --dry-run
 ```
 
 After installation, activate the Python virtual environment:
