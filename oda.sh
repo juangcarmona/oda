@@ -23,6 +23,7 @@ UPDATE_CMD=""
 readonly INSTALL_DIR="$HOME/.oda"
 readonly VENV_DIR="$HOME/.oda-venv"
 readonly LOG_FILE="/tmp/oda-install.log"
+readonly STATUS_FILE="$INSTALL_DIR/.install_status"
 readonly REQUIRED_SPACE_GB=20
 HAS_GPU=false
 
@@ -302,18 +303,98 @@ setup_docker() {
     fi
 }
 
-setup_development_tools() {
-    log "Setting up development tools..."
+# Function to mark a step as completed
+mark_completed() {
+    local step=$1
+    mkdir -p "$(dirname "$STATUS_FILE")"
+    touch "$STATUS_FILE"
+    if ! grep -q "^$step$" "$STATUS_FILE" 2>/dev/null; then
+        echo "$step" >> "$STATUS_FILE"
+    fi
+}
+
+# Function to check if a step is completed
+is_completed() {
+    local step=$1
+    [ -f "$STATUS_FILE" ] && grep -q "^$step$" "$STATUS_FILE" 2>/dev/null
+}
+
+# Function to run a step if not already completed
+run_step() {
+    local step=$1
+    local step_func=$2
     
-    # Install VS Code
+    if ! is_completed "$step"; then
+        log "Running step: $step"
+        if $step_func; then
+            mark_completed "$step"
+            log "Step completed successfully: $step"
+        else
+            error "Step failed: $step"
+            return 1
+        fi
+    else
+        log "Skipping completed step: $step"
+    fi
+    return 0
+}
+
+setup_development_tools() {
+    # VS Code installation
+    run_step "vscode" _install_vscode || return 1
+    
+    # Oh My Zsh installation
+    run_step "oh-my-zsh" _install_oh_my_zsh || return 1
+    
+    # llama.cpp installation
+    run_step "llama-cpp" _install_llama_cpp || return 1
+}
+
+_install_vscode() {
     case "$DISTRO" in
         ubuntu)
-            wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
-            sudo install -o root -g root -m 644 packages.microsoft.gpg /etc/apt/trusted.gpg.d/
-            sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/trusted.gpg.d/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
-            rm -f packages.microsoft.gpg
+            log "Cleaning up any previous failed installations..."
+            sudo dpkg --remove --force-remove-reinstreq code || true
+            sudo apt-get remove --purge code || true
+            
+            log "Fixing package system..."
+            sudo apt-get clean
+            sudo apt-get autoclean
             sudo apt-get update
-            $INSTALL_CMD code
+            sudo apt-get --fix-broken install -y
+            
+            log "Installing VS Code dependencies one by one..."
+            dependencies=(
+                "xdg-utils"
+                "libxrandr2"
+                "libxkbfile1"
+                "libxkbcommon0"
+                "libxfixes3"
+                "libxdamage1"
+                "libxcomposite1"
+                "libpango-1.0-0"
+                "libgtk-3-0"
+                "libgbm1"
+                "libcairo2"
+                "libatspi2.0-0"
+                "libatk1.0-0"
+                "libatk-bridge2.0-0"
+                "libvulkan1"
+            )
+
+            for dep in "${dependencies[@]}"; do
+                log "Installing $dep..."
+                sudo apt-get install -y "$dep" || {
+                    warn "Failed to install $dep, continuing..."
+                    continue
+                }
+            done
+
+            log "Installing VS Code via direct download..."
+            wget -O /tmp/vscode.deb "https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64"
+            sudo dpkg -i /tmp/vscode.deb || true
+            sudo apt-get install -f -y
+            rm /tmp/vscode.deb
             ;;
         redhat)
             sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
@@ -321,46 +402,97 @@ setup_development_tools() {
             $INSTALL_CMD code
             ;;
     esac
-    
-    # Install Oh My Zsh
-    sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-    
-    # Clone and build llama.cpp
-    git clone https://github.com/ggerganov/llama.cpp.git "$INSTALL_DIR/llama.cpp"
-    cd "$INSTALL_DIR/llama.cpp"
-    if [ "$HAS_GPU" = true ]; then
-        make CUDA=1
+    return 0
+}
+
+_install_oh_my_zsh() {
+    if [ -d "$HOME/.oh-my-zsh" ]; then
+        log "Oh My Zsh is already installed. Skipping installation..."
+        if [ -d "$HOME/.oh-my-zsh/.git" ]; then
+            log "Updating Oh My Zsh via git..."
+            (cd "$HOME/.oh-my-zsh" && git pull)
+        fi
     else
-        make
+        log "Installing Oh My Zsh..."
+        sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    fi
+    return 0
+}
+
+_install_llama_cpp() {
+    LLAMA_DIR="$INSTALL_DIR/llama.cpp"
+    if [ -d "$LLAMA_DIR" ]; then
+        log "llama.cpp directory already exists. Updating..."
+        cd "$LLAMA_DIR"
+        git pull origin master
+    else
+        log "Cloning llama.cpp..."
+        git clone https://github.com/ggerganov/llama.cpp.git "$LLAMA_DIR"
+        cd "$LLAMA_DIR"
     fi
     
-    # Add llama.cpp to PATH
-    echo 'export PATH="$PATH:$HOME/.oda/llama.cpp"' >> "$HOME/.zshrc"
-    # Also add to .bashrc for compatibility
-    echo 'export PATH="$PATH:$HOME/.oda/llama.cpp"' >> "$HOME/.bashrc"
+    log "Building llama.cpp..."
+    if [ "$HAS_GPU" = true ]; then
+        make clean && make CUDA=1
+    else
+        make clean && make
+    fi
+    return 0
 }
 
 setup_ai_tools() {
-    log "Setting up AI development tools..."
+    # Install TVM dependencies
+    run_step "tvm-deps" _install_tvm_deps || return 1
     
-    # Activate virtual environment
-    source "$VENV_DIR/bin/activate"
+    # Install and build TVM
+    run_step "tvm" _install_tvm || return 1
     
-    # Install TensorFlow Lite
-    pip install tensorflow-lite
+    # Install Python AI packages
+    run_step "python-ai-packages" _install_python_ai_packages || return 1
     
-    # Install ONNX and ONNX Runtime
-    pip install onnx onnxruntime-gpu
+    # Install OpenVINO
+    run_step "openvino" _install_openvino || return 1
     
-    # Install PyTorch Mobile
-    pip install torch torchvision torchaudio
+    # Install NCNN
+    run_step "ncnn" _install_ncnn || return 1
     
-    # Install TVM
-    git clone --recursive https://github.com/apache/tvm tvm
-    cd tvm
-    git checkout v${TVM_VERSION}
-    mkdir build
-    cp cmake/config.cmake build
+    # Install ARM NN (only for aarch64)
+    if [ "$(uname -m)" = "aarch64" ]; then
+        run_step "armnn" _install_armnn || return 1
+    fi
+}
+
+_install_tvm_deps() {
+    case "$DISTRO" in
+        ubuntu)
+            $INSTALL_CMD cmake build-essential git python3-dev python3-setuptools gcc libtinfo-dev zlib1g-dev libedit-dev libxml2-dev
+            ;;
+        redhat)
+            $INSTALL_CMD cmake gcc-c++ git python3-devel python3-setuptools ncurses-devel zlib-devel
+            ;;
+    esac
+    return 0
+}
+
+_install_tvm() {
+    if [ -d "tvm" ]; then
+        log "TVM directory exists. Updating..."
+        cd tvm
+        git fetch --all
+        git checkout v${TVM_VERSION}
+        git submodule update --init --recursive
+    else
+        log "Cloning TVM..."
+        git clone --recursive https://github.com/apache/tvm tvm
+        cd tvm
+        git checkout v${TVM_VERSION}
+    fi
+
+    log "Building TVM..."
+    mkdir -p build
+    cp cmake/config.cmake build/ || {
+        log "config.cmake already exists in build directory"
+    }
     cd build
     if [ "$HAS_GPU" = true ]; then
         echo "set(USE_CUDA ON)" >> config.cmake
@@ -371,32 +503,22 @@ setup_ai_tools() {
     cd python
     pip install -e .
     cd ../../
-    
-    # Install Edge Impulse CLI
-    npm install -g edge-impulse-cli
-    
-    # Install MediaPipe
+    return 0
+}
+
+_install_python_ai_packages() {
+    source "$VENV_DIR/bin/activate"
+    pip install tensorflow==${TENSORFLOW_VERSION}
+    pip install onnx onnxruntime-gpu
+    pip install torch torchvision torchaudio
     pip install mediapipe
-    
-    # Install Neural Network Distiller
-    git clone https://github.com/IntelLabs/distiller.git
-    cd distiller
-    pip install -e .
-    cd ..
-    
-    # Install MLPerf
     pip install mlperf-inference
-    
-    # Install additional optimization tools
-    pip install \
-        neural-compressor \
-        torch2trt \
-        tensorflow-model-optimization \
-        mxnet \
-        paddlepaddle-gpu \
-        tritonclient[all]
-    
-    # Install OpenVINO
+    pip install neural-compressor torch2trt tensorflow-model-optimization mxnet paddlepaddle-gpu tritonclient[all]
+    deactivate
+    return 0
+}
+
+_install_openvino() {
     case "$DISTRO" in
         ubuntu)
             wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
@@ -410,11 +532,13 @@ setup_ai_tools() {
             $INSTALL_CMD intel-openvino-dev
             ;;
     esac
-    
-    # Install NCNN
+    return 0
+}
+
+_install_ncnn() {
     git clone https://github.com/Tencent/ncnn.git
     cd ncnn
-    mkdir build
+    mkdir -p build
     cd build
     if [ "$HAS_GPU" = true ]; then
         cmake -DNCNN_VULKAN=ON ..
@@ -424,22 +548,21 @@ setup_ai_tools() {
     make -j$(nproc)
     sudo make install
     cd ../..
-    
-    # Install ARM NN
-    if [ "$(uname -m)" = "aarch64" ]; then
-        git clone https://github.com/ARM-software/armnn.git
-        cd armnn
-        mkdir build
-        cd build
-        cmake .. \
-            -DARMCOMPUTE_ROOT=/usr/local/include \
-            -DARMCOMPUTE_BUILD_DIR=/usr/local/lib
-        make -j$(nproc)
-        sudo make install
-        cd ../..
-    fi
-    
-    deactivate
+    return 0
+}
+
+_install_armnn() {
+    git clone https://github.com/ARM-software/armnn.git
+    cd armnn
+    mkdir -p build
+    cd build
+    cmake .. \
+        -DARMCOMPUTE_ROOT=/usr/local/include \
+        -DARMCOMPUTE_BUILD_DIR=/usr/local/lib
+    make -j$(nproc)
+    sudo make install
+    cd ../..
+    return 0
 }
 
 validate_system_requirements() {
