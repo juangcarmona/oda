@@ -232,8 +232,13 @@ install_nvidia() {
                 $INSTALL_CMD cuda-toolkit-12-0
                 
                 # Configure environment variables for CUDA in WSL
-                echo 'export PATH=/usr/local/cuda-12.0/bin${PATH:+:${PATH}}' >> ~/.zshrc
-                echo 'export LD_LIBRARY_PATH=/usr/local/cuda-12.0/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' >> ~/.zshrc
+                if ! grep -q 'export PATH=/usr/local/cuda-12.0/bin' ~/.zshrc; then
+                    echo 'export PATH=/usr/local/cuda-12.0/bin${PATH:+:${PATH}}' >> ~/.zshrc
+                fi
+
+                if ! grep -q 'export LD_LIBRARY_PATH=/usr/local/cuda-12.0/lib64' ~/.zshrc; then
+                    echo 'export LD_LIBRARY_PATH=/usr/local/cuda-12.0/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' >> ~/.zshrc
+                fi
                 source ~/.zshrc
 
                 log "CUDA toolkit installed successfully for WSL with Ubuntu."
@@ -605,6 +610,10 @@ _install_armnn() {
 
 validate_system_requirements() {
     log "Validating system requirements..."
+
+    if is_wsl; then
+        warn "Running in WSL. Some validations like disk space or system privileges may behave differently."
+    fi
     
     # Check disk space (20GB minimum)
     local free_space=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
