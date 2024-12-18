@@ -119,6 +119,15 @@ detect_distribution() {
     fi
 }
 
+is_wsl() {
+    # Check if running in Windows Subsystem for Linux
+    if grep -qi microsoft /proc/version; then
+        return 0  # We are in WSL
+    else
+        return 1
+    fi
+}
+
 detect_gpu() {
     if lspci | grep -i nvidia > /dev/null; then
         HAS_GPU=true
@@ -262,7 +271,12 @@ install_nvidia() {
 
 setup_docker() {
     log "Setting up Docker..."
-    
+
+    if is_wsl; then
+        warn "WSL detected. Skipping Docker installation. Use Docker Desktop for Windows with WSL integration."
+        return 0
+    fi
+
     case "$DISTRO" in
         ubuntu)
             # Install Docker using official repository
@@ -340,8 +354,13 @@ run_step() {
 }
 
 setup_development_tools() {
-    # VS Code installation
-    run_step "vscode" _install_vscode || return 1
+    # Skip VS Code installation if running in WSL
+    if is_wsl; then
+        warn "Detected WSL environment. Skipping Visual Studio Code installation."
+    else
+        # VS Code installation
+        run_step "vscode" _install_vscode || return 1
+    fi
     
     # Oh My Zsh installation
     run_step "oh-my-zsh" _install_oh_my_zsh || return 1
@@ -631,6 +650,11 @@ main() {
     
     # Validate system requirements
     validate_system_requirements
+
+    # Detect WSL
+    if is_wsl; then
+        log "WSL environment detected. Some components (e.g., VS Code) will be skipped."
+    fi
     
     # Detect distribution
     detect_distribution
