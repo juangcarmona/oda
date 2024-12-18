@@ -212,32 +212,58 @@ setup_python_environment() {
 
 install_nvidia() {
     if [ "$HAS_GPU" = false ]; then
+        log "No GPU detected. Skipping NVIDIA installation."
         return
     fi
-    
-    log "Installing NVIDIA components..."
-    
+
     case "$DISTRO" in
         ubuntu)
-            # Add NVIDIA repository
-            curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-            curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
-                sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-                sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-            
-            $UPDATE_CMD
-            
-            # Install NVIDIA drivers and CUDA
-            $INSTALL_CMD nvidia-driver-$NVIDIA_VERSION cuda-toolkit
-            
-            # Install TensorRT
-            $INSTALL_CMD tensorrt
-            
-            # Install NVIDIA Container Toolkit
-            $INSTALL_CMD nvidia-container-toolkit
+            if is_wsl; then
+                log "Detected WSL environment with Ubuntu. Skipping NVIDIA driver installation."
+
+                # Add the CUDA repository for WSL
+                curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/3bf863cc.pub | sudo apt-key add -
+                echo "deb https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/ /" | sudo tee /etc/apt/sources.list.d/cuda-wsl-ubuntu.list
+                
+                $UPDATE_CMD
+                
+                # Install CUDA toolkit and related tools
+                log "Installing CUDA toolkit for WSL."
+                $INSTALL_CMD cuda-toolkit-12-0
+                
+                # Configure environment variables for CUDA in WSL
+                echo 'export PATH=/usr/local/cuda-12.0/bin${PATH:+:${PATH}}' >> ~/.zshrc
+                echo 'export LD_LIBRARY_PATH=/usr/local/cuda-12.0/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' >> ~/.zshrc
+                source ~/.zshrc
+
+                log "CUDA toolkit installed successfully for WSL with Ubuntu."
+                return
+            else
+                log "Installing NVIDIA components for native Ubuntu."
+                
+                # Add NVIDIA repository
+                curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+                curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+                    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+                    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+                
+                $UPDATE_CMD
+                
+                # Install NVIDIA drivers and CUDA
+                log "Installing NVIDIA drivers and CUDA toolkit for native Ubuntu."
+                $INSTALL_CMD nvidia-driver-$NVIDIA_VERSION cuda-toolkit
+                
+                # Install TensorRT
+                $INSTALL_CMD tensorrt
+                
+                # Install NVIDIA Container Toolkit
+                $INSTALL_CMD nvidia-container-toolkit
+            fi
             ;;
             
         redhat)
+            log "Installing NVIDIA components for RedHat-based distributions."
+            
             # Add NVIDIA repository
             sudo dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
             
@@ -253,20 +279,13 @@ install_nvidia() {
             $INSTALL_CMD nvidia-container-toolkit
             ;;
     esac
-    
+
     # Install NVIDIA Triton
+    log "Installing NVIDIA Triton for model inference."
     sudo docker pull nvcr.io/nvidia/tritonserver:${TRITON_VERSION}-py3
     sudo docker pull nvcr.io/nvidia/tritonserver:${TRITON_VERSION}-py3-sdk
-    
-    # Install NVIDIA Nsight Systems
-    case "$DISTRO" in
-        ubuntu)
-            $INSTALL_CMD nsight-systems
-            ;;
-        redhat)
-            $INSTALL_CMD nsight-systems
-            ;;
-    esac
+
+    log "NVIDIA installation completed successfully."
 }
 
 setup_docker() {
@@ -653,7 +672,7 @@ main() {
 
     # Detect WSL
     if is_wsl; then
-        log "WSL environment detected. Some components (e.g., VS Code) will be skipped."
+        warn "WSL environment detected. Some components (VS Code, Docker and Nvidia) will be skipped or adjusted."
     fi
     
     # Detect distribution
