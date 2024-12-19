@@ -18,6 +18,7 @@ readonly TVM_VERSION="0.15.0"
 
 # Global variables
 DISTRO=""
+IS_WSL=false
 PACKAGE_MANAGER=""
 INSTALL_CMD=""
 UPDATE_CMD=""
@@ -89,6 +90,14 @@ setup_package_manager() {
     esac
 }
 
+detect_wsl() {
+    # Check if running in Windows Subsystem for Linux
+    if grep -qi microsoft /proc/version; then
+        IS_WSL=true 
+        warn "WSL environment detected. Some components will be skipped or adjusted accordingly."
+    fi
+}
+
 detect_distribution() {
     # Read os-release file
     if [ -f /etc/os-release ]; then
@@ -113,22 +122,10 @@ detect_distribution() {
             *)
                 error "Unsupported Linux distribution: $ID. Currently supporting Ubuntu and Red Hat compatible distributions"
                 ;;
-        esac    
-
-        if is_wsl; then
-            warn "WSL environment detected. Some components will be skipped or adjusted accordingly."
-        fi
+        esac  
+        detect_wsl  
     else
         error "Could not detect Linux distribution"
-    fi
-}
-
-is_wsl() {
-    # Check if running in Windows Subsystem for Linux
-    if grep -qi microsoft /proc/version; then
-        return 0  # We are in WSL
-    else
-        return 1
     fi
 }
 
@@ -222,8 +219,8 @@ install_nvidia() {
 
     case "$DISTRO" in
         ubuntu)
-            if is_wsl; then
-                log "Detected WSL environment with Ubuntu. Setting up CUDA environment for WSL."
+            if [ "$IS_WSL" = true ]; then
+                log "Installing NVIDIA components for WSL - Ubuntu."
 
                 $INSTALL_CMD gcc
 
@@ -308,7 +305,7 @@ install_nvidia() {
 setup_docker() {
     log "Setting up Docker..."
 
-    if is_wsl; then
+    if [ "$IS_WSL" = true ]; then
         warn "WSL detected. Skipping Docker installation. Use Docker Desktop for Windows with WSL integration."
         return 0
     fi
@@ -391,7 +388,7 @@ run_step() {
 
 setup_development_tools() {
     # Skip VS Code installation if running in WSL
-    if is_wsl; then
+    if [ "$IS_WSL" = true ]; then
         warn "Detected WSL environment. Skipping Visual Studio Code installation."
     else
         # VS Code installation
@@ -631,7 +628,7 @@ _install_armnn() {
 validate_system_requirements() {
     log "Validating system requirements..."
 
-    if is_wsl; then
+    if [ "$IS_WSL" = true ]; then
         warn "Running in WSL. Some validations like disk space or system privileges may behave differently."
     fi
     
@@ -715,11 +712,11 @@ main() {
     
     log "Starting ODA installation..."
     
-    # Validate system requirements
-    validate_system_requirements
-    
     # Detect distribution
     detect_distribution
+    
+    # Validate system requirements
+    validate_system_requirements
     
     # Setup package manager
     setup_package_manager
@@ -763,8 +760,6 @@ main() {
     log "Installation completed successfully!"
     echo -e "\nTo activate the Python environment, run:"
     echo -e "    ${GREEN}source $VENV_DIR/bin/activate${NC}"
-    echo -e "\nTo start using ZSH, run:"
-    echo -e "    ${GREEN}zsh${NC}"
     echo -e "\nInstallation log is available at: ${LOG_FILE}"
     
     # Print versions of installed components
