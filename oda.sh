@@ -454,21 +454,6 @@ _install_vscode() {
     return 0
 }
 
-_install_oh_my_zsh() {
-    if [ -d "$HOME/.oh-my-zsh" ]; then
-        log "Oh My Zsh is already installed. Skipping installation..."
-        if [ -d "$HOME/.oh-my-zsh/.git" ]; then
-            log "Updating Oh My Zsh via git..."
-            (cd "$HOME/.oh-my-zsh" && git pull)
-        fi
-    else
-        log "Installing Oh My Zsh..."
-        sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-    fi
-
-    return 0
-}
-
 _add_to_zshrc() {
     local var_name="$1"
     local var_value="$2"
@@ -682,24 +667,32 @@ cleanup() {
     log "Cleanup completed successfully"
 }
 
+# Ensure Zsh is installed and set as the default shell
 ensure_zsh() {
     if ! command -v zsh &>/dev/null; then
-        log "Zsh is not installed. Installing zsh..."
-        $INSTALL_CMD zsh || error "Failed to install zsh. Please install it manually and re-run the script."
+        log "Zsh is not installed. Installing Zsh..."
+        sudo apt-get update
+        sudo apt-get install -y zsh || error "Failed to install Zsh. Please install it manually and re-run the script."
     fi
 
-    if [ "$(basename "$SHELL")" != "zsh" ]; then
-        log "Zsh is not the default shell. Setting it up..."
+    if [ ! -d "$HOME/.oh-my-zsh" ]; then
+        log "Installing Oh My Zsh..."
+        sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended || error "Failed to install Oh My Zsh."
+    else
+        log "Oh My Zsh is already installed."
+    fi
+
+    if [ "$SHELL" != "$(which zsh)" ]; then
+        log "Setting Zsh as the default shell..."
         chsh -s "$(which zsh)" || error "Failed to set Zsh as the default shell. Please set it manually."
         log "Zsh has been set as the default shell."
-        warn "Please log out of your current session and open a new terminal. It should start with Zsh by default."
-        warn "Once in a Zsh shell, re-run this script to continue the installation."
+
+        warn "Please log out and log back in to apply the changes. Once in a Zsh shell, re-run this script to continue the installation."
         exit 0
     else
         log "Zsh is already the default shell. Proceeding with the installation..."
     fi
 }
-
 
 main() {
     # Print banner
