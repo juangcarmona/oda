@@ -10,6 +10,7 @@ readonly TENSORFLOW_VERSION="2.14.0"
 readonly NUMPY_VERSION="1.24.3"
 readonly PANDAS_VERSION="2.1.1"
 readonly SCIKIT_VERSION="1.3.1"
+readonly ML_DTYPES_VERSION="0.2.0"
 readonly NVIDIA_VERSION="535"
 readonly TENSORRT_VERSION="8.6.1"
 readonly TRITON_VERSION="2.40.0"
@@ -199,10 +200,10 @@ setup_python_environment() {
     # Install AI/ML packages
     if [ "$HAS_GPU" = true ]; then
         pip install "torch==${PYTORCH_VERSION}" --index-url https://download.pytorch.org/whl/cu118
-        pip install "tensorflow==${TENSORFLOW_VERSION}"
+        pip install "tensorflow==${TENSORFLOW_VERSION}" "ml-dtypes==$ML_DTYPES_VERSION"
     else
         pip install "torch==${PYTORCH_VERSION}" --index-url https://download.pytorch.org/whl/cpu
-        pip install "tensorflow-cpu==${TENSORFLOW_VERSION}"
+        pip install "tensorflow-cpu==${TENSORFLOW_VERSION}" "ml-dtypes==$ML_DTYPES_VERSION"
     fi
     
     pip install "numpy==${NUMPY_VERSION}" \
@@ -219,30 +220,43 @@ install_nvidia() {
     case "$DISTRO" in
         ubuntu)
             if is_wsl; then
-                log "Detected WSL environment with Ubuntu. Skipping NVIDIA driver installation."
+                log "Detected WSL environment with Ubuntu. Setting up CUDA environment for WSL."
 
-                # Add the CUDA repository for WSL
-                curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/3bf863cc.pub | sudo apt-key add -
-                echo "deb https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/ /" | sudo tee /etc/apt/sources.list.d/cuda-wsl-ubuntu.list
-                
-                $UPDATE_CMD
-                
-                # Install CUDA toolkit and related tools
-                log "Installing CUDA toolkit for WSL."
-                $INSTALL_CMD cuda-toolkit-12-0
-                
-                # Configure environment variables for CUDA in WSL
-                if ! grep -q 'export PATH=/usr/local/cuda-12.0/bin' ~/.zshrc; then
-                    echo 'export PATH=/usr/local/cuda-12.0/bin${PATH:+:${PATH}}' >> ~/.zshrc
-                fi
+                # Step 1: Update and install required packages
+                sudo apt update
+                sudo apt upgrade -y
+                sudo apt install -y gcc
 
-                if ! grep -q 'export LD_LIBRARY_PATH=/usr/local/cuda-12.0/lib64' ~/.zshrc; then
-                    echo 'export LD_LIBRARY_PATH=/usr/local/cuda-12.0/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' >> ~/.zshrc
-                fi
+                # Step 2: Remove potentially conflicting keys
+                sudo apt-key del 7fa2af80 || log "Key not found, skipping removal."
+
+                # Step 3: Configure CUDA repository
+                wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-wsl-ubuntu.pin
+                sudo mv cuda-wsl-ubuntu.pin /etc/apt/preferences.d/cuda-repository-pin-600
+                wget https://developer.download.nvidia.com/compute/cuda/12.5.1/local_installers/cuda-repo-wsl-ubuntu-12-5-local_12.5.1-1_amd64.deb
+                sudo dpkg -i cuda-repo-wsl-ubuntu-12-5-local_12.5.1-1_amd64.deb
+                sudo cp /var/cuda-repo-wsl-ubuntu-12-5-local/cuda-*-keyring.gpg /usr/share/keyrings/
+
+                # Step 4: Install CUDA toolkit
+                sudo apt-get update
+                sudo apt-get -y install cuda-toolkit-12-5
+
+                # Step 5: Configure environment variables
+                log "Setting environment variables for CUDA."
+
+                # Add CUDA environment variables to .zshrc
+                _add_to_zshrc "PATH" "/usr/local/cuda-12/bin\${PATH:+:\${PATH}}"
+                _add_to_zshrc "LD_LIBRARY_PATH" "/usr/local/cuda-12/lib64\${LD_LIBRARY_PATH:+:\${LD_LIBRARY_PATH}}"
+                _add_to_zshrc "CUDACXX" "/usr/local/cuda-12/bin/nvcc"
+                _add_to_zshrc "CMAKE_ARGS" "\"-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=all-major\""
+
+                # Load the new environment variables
                 source ~/.zshrc
+                
+                # Install TensorRT
+                $INSTALL_CMD tensorrt
 
-                log "CUDA toolkit installed successfully for WSL with Ubuntu."
-                return
+                log "CUDA toolkit and environment variables set up successfully for WSL."
             else
                 log "Installing NVIDIA components for native Ubuntu."
                 
@@ -386,9 +400,6 @@ setup_development_tools() {
         run_step "vscode" _install_vscode || return 1
     fi
     
-    # Oh My Zsh installation
-    run_step "oh-my-zsh" _install_oh_my_zsh || return 1
-    
     # llama.cpp installation
     run_step "llama-cpp" _install_llama_cpp || return 1
 }
@@ -459,7 +470,24 @@ _install_oh_my_zsh() {
         log "Installing Oh My Zsh..."
         sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
     fi
+
+    # Set Zsh as the default shell
+    if [ "$(basename "$SHELL")" != "zsh" ]; then
+        log "Setting Zsh as the default shell..."
+        chsh -s "$(which zsh)" || error "Failed to set Zsh as the default shell. Please set it manually."
+    fi
+
     return 0
+}
+
+_add_to_zshrc() {
+    local var_name="$1"
+    local var_value="$2"
+    local full_entry="export $var_name=$var_value"
+
+    if ! grep -q "$full_entry" ~/.zshrc; then
+        echo "$full_entry" >> ~/.zshrc
+    fi
 }
 
 _install_llama_cpp() {
@@ -665,6 +693,18 @@ cleanup() {
     log "Cleanup completed successfully"
 }
 
+ensure_zsh() {
+    if [ "$(basename "$SHELL")" != "zsh" ]; then
+        log "Zsh is not the default shell. Setting it up..."
+        _install_oh_my_zsh
+        log "Zsh has been installed and set as the default shell."
+        log "Please restart this script in a Zsh shell to continue."
+        exit 0
+    else
+        log "Zsh is already the default shell. Proceeding with the installation..."
+    fi
+}
+
 main() {
     # Print banner
     echo -e "${BLUE}"
@@ -679,9 +719,12 @@ main() {
     # Validate system requirements
     validate_system_requirements
 
+    # Ensure Zsh is installed and used
+    ensure_zsh
+
     # Detect WSL
     if is_wsl; then
-        warn "WSL environment detected. Some components (VS Code, Docker and Nvidia) will be skipped or adjusted."
+        warn "WSL environment detected. Some components (VS Code, Docker and NVIDIA) will be skipped or adjusted."
     fi
     
     # Detect distribution
