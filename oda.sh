@@ -694,16 +694,23 @@ cleanup() {
 }
 
 ensure_zsh() {
+    if ! command -v zsh &>/dev/null; then
+        log "Zsh is not installed. Installing zsh..."
+        $INSTALL_CMD zsh || error "Failed to install zsh. Please install it manually and re-run the script."
+    fi
+
     if [ "$(basename "$SHELL")" != "zsh" ]; then
         log "Zsh is not the default shell. Setting it up..."
-        _install_oh_my_zsh
-        log "Zsh has been installed and set as the default shell."
-        log "Please restart this script in a Zsh shell to continue."
+        chsh -s "$(which zsh)" || error "Failed to set Zsh as the default shell. Please set it manually."
+        log "Zsh has been set as the default shell."
+        warn "Please log out of your current session and open a new terminal. It should start with Zsh by default."
+        warn "Once in a Zsh shell, re-run this script to continue the installation."
         exit 0
     else
         log "Zsh is already the default shell. Proceeding with the installation..."
     fi
 }
+
 
 main() {
     # Print banner
@@ -719,9 +726,6 @@ main() {
     # Validate system requirements
     validate_system_requirements
 
-    # Ensure Zsh is installed and used
-    ensure_zsh
-
     # Detect WSL
     if is_wsl; then
         warn "WSL environment detected. Some components (VS Code, Docker and NVIDIA) will be skipped or adjusted."
@@ -735,6 +739,9 @@ main() {
     
     # Install base packages
     install_base_packages
+
+    # Ensure Zsh is installed and used
+    ensure_zsh
     
     # Install Python
     install_python
