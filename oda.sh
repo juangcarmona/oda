@@ -477,24 +477,42 @@ _add_to_zshrc() {
 
 _install_llama_cpp() {
     LLAMA_DIR="$INSTALL_DIR/llama.cpp"
+    
+    # Clone or update llama.cpp repository
     if [ -d "$LLAMA_DIR" ]; then
-        log "llama.cpp directory already exists. Updating..."
         cd "$LLAMA_DIR"
         git pull origin master
     else
-        log "Cloning llama.cpp..."
         git clone https://github.com/ggerganov/llama.cpp.git "$LLAMA_DIR"
         cd "$LLAMA_DIR"
     fi
-    
-    log "Building llama.cpp..."
+
     if [ "$HAS_GPU" = true ]; then
-        make clean && make CUDA=1
+        if is_wsl; then
+            log "Detected WSL environment. Building llama.cpp with CUDA support using WSL configurations."
+            
+            # Set default values for CUDA-specific variables if not already set
+            CUDACXX=${CUDACXX:-/usr/local/cuda-12/bin/nvcc}
+            CMAKE_ARGS=${CMAKE_ARGS:-"-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=all-major"}
+            
+            # Clean previous builds and build with CUDA support
+            make clean
+            export CUDACXX="$CUDACXX"
+            export CMAKE_ARGS="$CMAKE_ARGS"
+            make CUDA=1
+        else
+            log "Building llama.cpp with native CUDA support."
+            make clean && make CUDA=1
+        fi
     else
+        log "Building llama.cpp without CUDA support."
         make clean && make
     fi
+
+    log "llama.cpp build completed successfully."
     return 0
 }
+
 
 setup_ai_tools() {
     # Install TVM dependencies
