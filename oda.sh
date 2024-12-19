@@ -130,18 +130,29 @@ detect_distribution() {
 }
 
 detect_gpu() {
-    if lspci | grep -i nvidia > /dev/null; then
-        HAS_GPU=true
-        # Check NVIDIA driver compatibility
-        if nvidia-smi &> /dev/null; then
-            local driver_version
-            driver_version=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader)
-            log "NVIDIA GPU detected with driver version: $driver_version"
+    if [ "$IS_WSL" = true ]; then
+        if command -v nvidia-smi &>/dev/null; then
+            HAS_GPU=true
+            log "GPU detected via NVIDIA in WSL environment."
         else
-            warn "NVIDIA GPU detected but no drivers installed"
+            HAS_GPU=false
+            warn "No GPU detected in WSL environment. Ensure GPU support is enabled in Windows and drivers are installed."
         fi
     else
-        warn "No NVIDIA GPU detected, installing CPU-only versions"
+        if lspci | grep -i nvidia > /dev/null; then
+            HAS_GPU=true
+            # Check NVIDIA driver compatibility
+            if nvidia-smi &> /dev/null; then
+                local driver_version
+                driver_version=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader)
+                log "NVIDIA GPU detected with driver version: $driver_version"
+            else
+                warn "NVIDIA GPU detected but no drivers installed"
+            fi
+        else
+            HAS_GPU=false
+            warn "No NVIDIA GPU detected."
+        fi
     fi
 }
 
@@ -710,6 +721,9 @@ main() {
     
     # Validate system requirements
     validate_system_requirements
+
+    # Detect GPU
+    detect_gpu
     
     # Setup package manager
     setup_package_manager
