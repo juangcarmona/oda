@@ -5,11 +5,12 @@ trap 'error "Failed at line $LINENO. Exit code: $?"' ERR
 
 # Version-pinned dependencies
 readonly PYTHON_VERSION="3.10"
-readonly PYTORCH_VERSION="2.1.0"
+readonly PYTORCH_VERSION="2.5.1"
 readonly TENSORFLOW_VERSION="2.14.0"
 readonly NUMPY_VERSION="1.24.3"
 readonly PANDAS_VERSION="2.1.1"
 readonly SCIKIT_VERSION="1.3.1"
+readonly ML_DTYPES_VERSION="0.2.0"
 readonly NVIDIA_VERSION="535"
 readonly TENSORRT_VERSION="8.6.1"
 readonly TRITON_VERSION="2.40.0"
@@ -119,6 +120,15 @@ detect_distribution() {
     fi
 }
 
+is_wsl() {
+    # Check if running in Windows Subsystem for Linux
+    if grep -qi microsoft /proc/version; then
+        return 0  # We are in WSL
+    else
+        return 1
+    fi
+}
+
 detect_gpu() {
     if lspci | grep -i nvidia > /dev/null; then
         HAS_GPU=true
@@ -190,10 +200,10 @@ setup_python_environment() {
     # Install AI/ML packages
     if [ "$HAS_GPU" = true ]; then
         pip install "torch==${PYTORCH_VERSION}" --index-url https://download.pytorch.org/whl/cu118
-        pip install "tensorflow==${TENSORFLOW_VERSION}"
+        pip install "tensorflow==${TENSORFLOW_VERSION}" "ml-dtypes==$ML_DTYPES_VERSION"
     else
         pip install "torch==${PYTORCH_VERSION}" --index-url https://download.pytorch.org/whl/cpu
-        pip install "tensorflow-cpu==${TENSORFLOW_VERSION}"
+        pip install "tensorflow-cpu==${TENSORFLOW_VERSION}" "ml-dtypes==$ML_DTYPES_VERSION"
     fi
     
     pip install "numpy==${NUMPY_VERSION}" \
@@ -304,7 +314,7 @@ setup_docker() {
         warn "WSL detected. Skipping Docker installation. Use Docker Desktop for Windows with WSL integration."
         return 0
     fi
-    
+
     case "$DISTRO" in
         ubuntu)
             # Install Docker using official repository
@@ -382,11 +392,13 @@ run_step() {
 }
 
 setup_development_tools() {
-    # VS Code installation
-    run_step "vscode" _install_vscode || return 1
-    
-    # Oh My Zsh installation
-    run_step "oh-my-zsh" _install_oh_my_zsh || return 1
+    # Skip VS Code installation if running in WSL
+    if is_wsl; then
+        warn "Detected WSL environment. Skipping Visual Studio Code installation."
+    else
+        # VS Code installation
+        run_step "vscode" _install_vscode || return 1
+    fi
     
     # llama.cpp installation
     run_step "llama-cpp" _install_llama_cpp || return 1
@@ -458,7 +470,18 @@ _install_oh_my_zsh() {
         log "Installing Oh My Zsh..."
         sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
     fi
+
     return 0
+}
+
+_add_to_zshrc() {
+    local var_name="$1"
+    local var_value="$2"
+    local full_entry="export $var_name=$var_value"
+
+    if ! grep -q "$full_entry" ~/.zshrc; then
+        echo "$full_entry" >> ~/.zshrc
+    fi
 }
 
 _install_llama_cpp() {
@@ -609,6 +632,10 @@ _install_armnn() {
 
 validate_system_requirements() {
     log "Validating system requirements..."
+
+    if is_wsl; then
+        warn "Running in WSL. Some validations like disk space or system privileges may behave differently."
+    fi
     
     # Check disk space (20GB minimum)
     local free_space=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
@@ -660,6 +687,25 @@ cleanup() {
     log "Cleanup completed successfully"
 }
 
+ensure_zsh() {
+    if ! command -v zsh &>/dev/null; then
+        log "Zsh is not installed. Installing zsh..."
+        $INSTALL_CMD zsh || error "Failed to install zsh. Please install it manually and re-run the script."
+    fi
+
+    if [ "$(basename "$SHELL")" != "zsh" ]; then
+        log "Zsh is not the default shell. Setting it up..."
+        chsh -s "$(which zsh)" || error "Failed to set Zsh as the default shell. Please set it manually."
+        log "Zsh has been set as the default shell."
+        warn "Please log out of your current session and open a new terminal. It should start with Zsh by default."
+        warn "Once in a Zsh shell, re-run this script to continue the installation."
+        exit 0
+    else
+        log "Zsh is already the default shell. Proceeding with the installation..."
+    fi
+}
+
+
 main() {
     # Print banner
     echo -e "${BLUE}"
@@ -673,6 +719,11 @@ main() {
     
     # Validate system requirements
     validate_system_requirements
+
+    # Detect WSL
+    if is_wsl; then
+        warn "WSL environment detected. Some components (VS Code, Docker and NVIDIA) will be skipped or adjusted."
+    fi
     
     # Detect distribution
     detect_distribution
@@ -680,11 +731,11 @@ main() {
     # Setup package manager
     setup_package_manager
     
-    # Detect GPU
-    detect_gpu
-    
     # Install base packages
     install_base_packages
+
+    # Ensure Zsh is installed and used
+    ensure_zsh
     
     # Install Python
     install_python
