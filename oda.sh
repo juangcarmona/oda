@@ -203,32 +203,76 @@ setup_python_environment() {
 
 install_nvidia() {
     if [ "$HAS_GPU" = false ]; then
+        log "No GPU detected. Skipping NVIDIA installation."
         return
     fi
-    
-    log "Installing NVIDIA components..."
-    
+
     case "$DISTRO" in
         ubuntu)
-            # Add NVIDIA repository
-            curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-            curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
-                sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-                sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-            
-            $UPDATE_CMD
-            
-            # Install NVIDIA drivers and CUDA
-            $INSTALL_CMD nvidia-driver-$NVIDIA_VERSION cuda-toolkit
-            
-            # Install TensorRT
-            $INSTALL_CMD tensorrt
-            
-            # Install NVIDIA Container Toolkit
-            $INSTALL_CMD nvidia-container-toolkit
+            if is_wsl; then
+                log "Detected WSL environment with Ubuntu. Setting up CUDA environment for WSL."
+
+                # Step 1: Update and install required packages
+                sudo apt update
+                sudo apt upgrade -y
+                sudo apt install -y gcc
+
+                # Step 2: Remove potentially conflicting keys
+                sudo apt-key del 7fa2af80 || log "Key not found, skipping removal."
+
+                # Step 3: Configure CUDA repository
+                wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-wsl-ubuntu.pin
+                sudo mv cuda-wsl-ubuntu.pin /etc/apt/preferences.d/cuda-repository-pin-600
+                wget https://developer.download.nvidia.com/compute/cuda/12.5.1/local_installers/cuda-repo-wsl-ubuntu-12-5-local_12.5.1-1_amd64.deb
+                sudo dpkg -i cuda-repo-wsl-ubuntu-12-5-local_12.5.1-1_amd64.deb
+                sudo cp /var/cuda-repo-wsl-ubuntu-12-5-local/cuda-*-keyring.gpg /usr/share/keyrings/
+
+                # Step 4: Install CUDA toolkit
+                sudo apt-get update
+                sudo apt-get -y install cuda-toolkit-12-5
+
+                # Step 5: Configure environment variables
+                log "Setting environment variables for CUDA."
+
+                # Add CUDA environment variables to .zshrc
+                _add_to_zshrc "PATH" "/usr/local/cuda-12/bin\${PATH:+:\${PATH}}"
+                _add_to_zshrc "LD_LIBRARY_PATH" "/usr/local/cuda-12/lib64\${LD_LIBRARY_PATH:+:\${LD_LIBRARY_PATH}}"
+                _add_to_zshrc "CUDACXX" "/usr/local/cuda-12/bin/nvcc"
+                _add_to_zshrc "CMAKE_ARGS" "\"-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=all-major\""
+
+                # Load the new environment variables
+                source ~/.zshrc
+                
+                # Install TensorRT
+                $INSTALL_CMD tensorrt
+
+                log "CUDA toolkit and environment variables set up successfully for WSL."
+            else
+                log "Installing NVIDIA components for native Ubuntu."
+                
+                # Add NVIDIA repository
+                curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+                curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+                    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+                    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+                
+                $UPDATE_CMD
+                
+                # Install NVIDIA drivers and CUDA
+                log "Installing NVIDIA drivers and CUDA toolkit for native Ubuntu."
+                $INSTALL_CMD nvidia-driver-$NVIDIA_VERSION cuda-toolkit
+                
+                # Install TensorRT
+                $INSTALL_CMD tensorrt
+                
+                # Install NVIDIA Container Toolkit
+                $INSTALL_CMD nvidia-container-toolkit
+            fi
             ;;
             
         redhat)
+            log "Installing NVIDIA components for RedHat-based distributions."
+            
             # Add NVIDIA repository
             sudo dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
             
@@ -244,20 +288,13 @@ install_nvidia() {
             $INSTALL_CMD nvidia-container-toolkit
             ;;
     esac
-    
+
     # Install NVIDIA Triton
+    log "Installing NVIDIA Triton for model inference."
     sudo docker pull nvcr.io/nvidia/tritonserver:${TRITON_VERSION}-py3
     sudo docker pull nvcr.io/nvidia/tritonserver:${TRITON_VERSION}-py3-sdk
-    
-    # Install NVIDIA Nsight Systems
-    case "$DISTRO" in
-        ubuntu)
-            $INSTALL_CMD nsight-systems
-            ;;
-        redhat)
-            $INSTALL_CMD nsight-systems
-            ;;
-    esac
+
+    log "NVIDIA installation completed successfully."
 }
 
 setup_docker() {
