@@ -222,29 +222,24 @@ install_nvidia() {
             if is_wsl; then
                 log "Detected WSL environment with Ubuntu. Setting up CUDA environment for WSL."
 
-                # Step 1: Update and install required packages
-                sudo apt update
-                sudo apt upgrade -y
-                sudo apt install -y gcc
+                $INSTALL_CMD gcc
 
-                # Step 2: Remove potentially conflicting keys
+                # Remove potentially conflicting keys
                 sudo apt-key del 7fa2af80 || log "Key not found, skipping removal."
 
-                # Step 3: Configure CUDA repository
+                # Configure CUDA repository
                 wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-wsl-ubuntu.pin
                 sudo mv cuda-wsl-ubuntu.pin /etc/apt/preferences.d/cuda-repository-pin-600
                 wget https://developer.download.nvidia.com/compute/cuda/12.5.1/local_installers/cuda-repo-wsl-ubuntu-12-5-local_12.5.1-1_amd64.deb
                 sudo dpkg -i cuda-repo-wsl-ubuntu-12-5-local_12.5.1-1_amd64.deb
                 sudo cp /var/cuda-repo-wsl-ubuntu-12-5-local/cuda-*-keyring.gpg /usr/share/keyrings/
 
-                # Step 4: Install CUDA toolkit
+                # Install CUDA toolkit
                 sudo apt-get update
-                sudo apt-get -y install cuda-toolkit-12-5
+                $INSTALL_CMD cuda-toolkit-12-5
 
-                # Step 5: Configure environment variables
+                # Configure environment variables
                 log "Setting environment variables for CUDA."
-
-                # Add CUDA environment variables to .zshrc
                 _add_to_zshrc "PATH" "/usr/local/cuda-12/bin\${PATH:+:\${PATH}}"
                 _add_to_zshrc "LD_LIBRARY_PATH" "/usr/local/cuda-12/lib64\${LD_LIBRARY_PATH:+:\${LD_LIBRARY_PATH}}"
                 _add_to_zshrc "CUDACXX" "/usr/local/cuda-12/bin/nvcc"
