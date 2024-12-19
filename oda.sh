@@ -5,7 +5,7 @@ trap 'error "Failed at line $LINENO. Exit code: $?"' ERR
 
 # Version-pinned dependencies
 readonly PYTHON_VERSION="3.10"
-readonly PYTORCH_VERSION="2.1.0"
+readonly PYTORCH_VERSION="2.5.1"
 readonly TENSORFLOW_VERSION="2.14.0"
 readonly NUMPY_VERSION="1.24.3"
 readonly PANDAS_VERSION="2.1.1"
