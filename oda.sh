@@ -114,7 +114,11 @@ detect_distribution() {
                 error "Unsupported Linux distribution: $ID. Currently supporting Ubuntu and Red Hat compatible distributions"
                 ;;
         esac
-        setup_package_manager
+        setup_package_manager        
+
+        if is_wsl; then
+            warn "WSL environment detected. Some components will be skipped or adjusted accordingly."
+        fi
     else
         error "Could not detect Linux distribution"
     fi
@@ -714,11 +718,6 @@ main() {
     
     # Validate system requirements
     validate_system_requirements
-
-    # Detect WSL
-    if is_wsl; then
-        warn "WSL environment detected. Some components (VS Code, Docker and NVIDIA) will be skipped or adjusted."
-    fi
     
     # Detect distribution
     detect_distribution
