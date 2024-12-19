@@ -299,6 +299,11 @@ install_nvidia() {
 
 setup_docker() {
     log "Setting up Docker..."
+
+    if is_wsl; then
+        warn "WSL detected. Skipping Docker installation. Use Docker Desktop for Windows with WSL integration."
+        return 0
+    fi
     
     case "$DISTRO" in
         ubuntu)
