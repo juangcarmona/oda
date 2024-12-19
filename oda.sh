@@ -113,8 +113,7 @@ detect_distribution() {
             *)
                 error "Unsupported Linux distribution: $ID. Currently supporting Ubuntu and Red Hat compatible distributions"
                 ;;
-        esac
-        setup_package_manager        
+        esac    
 
         if is_wsl; then
             warn "WSL environment detected. Some components will be skipped or adjusted accordingly."
