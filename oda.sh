@@ -13,7 +13,7 @@ readonly SCIKIT_VERSION="1.3.1"
 readonly ML_DTYPES_VERSION="0.2.0"
 readonly NVIDIA_VERSION="535"
 readonly TENSORRT_VERSION="8.6.1"
-readonly TRITON_VERSION="2.40.0"
+readonly TRITON_VERSION="24.11"
 readonly TVM_VERSION="0.15.0"
 
 # Global variables
@@ -229,25 +229,47 @@ install_nvidia() {
     fi
 
     case "$DISTRO" in
-        ubuntu)
+        ubuntu)            
             if [ "$IS_WSL" = true ]; then
                 log "Installing NVIDIA components for WSL - Ubuntu."
-
-                $INSTALL_CMD gcc
 
                 # Remove potentially conflicting keys
                 sudo apt-key del 7fa2af80 || log "Key not found, skipping removal."
 
                 # Configure CUDA repository
-                wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-wsl-ubuntu.pin
-                sudo mv cuda-wsl-ubuntu.pin /etc/apt/preferences.d/cuda-repository-pin-600
-                wget https://developer.download.nvidia.com/compute/cuda/12.5.1/local_installers/cuda-repo-wsl-ubuntu-12-5-local_12.5.1-1_amd64.deb
-                sudo dpkg -i cuda-repo-wsl-ubuntu-12-5-local_12.5.1-1_amd64.deb
-                sudo cp /var/cuda-repo-wsl-ubuntu-12-5-local/cuda-*-keyring.gpg /usr/share/keyrings/
+                if [ ! -f /usr/share/keyrings/cuda-archive-keyring.gpg ]; then
+                    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+                    sudo dpkg -i cuda-keyring_1.1-1_all.deb
+                    echo "deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /" | sudo tee /etc/apt/sources.list.d/cuda.list
+                    
+                    # Install CUDA toolkit
+                    sudo apt-get update
+                    $INSTALL_CMD cuda-toolkit-12-5
+                fi
 
-                # Install CUDA toolkit
+                # Configure cuDNN repository
+                if [ ! -f cudnn-local-repo-ubuntu2204-8.9.7.29_1.0-1_amd64.deb ]; then
+                    wget -O cudnn-local-repo.deb "https://developer.download.nvidia.com/compute/redist/cudnn/v8.9.7/local_installers/cudnn-local-repo-ubuntu2204-8.9.7.29_1.0-1_amd64.deb"
+                    sudo dpkg -i cudnn-local-repo.deb
+                    sudo cp /var/cudnn-local-repo-ubuntu2204-8.9.7.29/cudnn-local-08A7D361-keyring.gpg /usr/share/keyrings/
+                    echo "deb [signed-by=/usr/share/keyrings/cudnn-local-08A7D361-keyring.gpg] file:/var/cudnn-local-repo-ubuntu2204-8.9.7.29/ /" | sudo tee /etc/apt/sources.list.d/cudnn-local.list
+                    # Install cuDNN libraries
+                    sudo apt-get update
+                    $INSTALL_CMD libcudnn8 libcudnn8-dev
+                fi
+              
+                # Configure TensorRT repository and install
+                if [ ! -f nv-tensorrt-local-repo-ubuntu2204-10.7.0-cuda-12.6_1.0-1_amd64.deb ]; then
+                    wget https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.7.0/local_repo/nv-tensorrt-local-repo-ubuntu2204-10.7.0-cuda-12.6_1.0-1_amd64.deb
+                    sudo dpkg -i nv-tensorrt-local-repo-ubuntu2204-10.7.0-cuda-12.6_1.0-1_amd64.deb
+                    sudo cp /var/nv-tensorrt-local-repo-ubuntu2204-10.7.0-cuda-12.6/*-keyring.gpg /usr/share/keyrings/
+                    echo "deb [signed-by=/usr/share/keyrings/nv-tensorrt-local-F234AD55-keyring.gpg] file:/var/nv-tensorrt-local-repo-ubuntu2204-10.7.0-cuda-12.6/ /" | sudo tee /etc/apt/sources.list.d/tensorrt-local.list
+                fi
+
+                # Update and install TensorRT
                 sudo apt-get update
-                $INSTALL_CMD cuda-toolkit-12-5
+                $INSTALL_CMD tensorrt
+                $INSTALL_CMD python3-libnvinfer-lean
 
                 # Configure environment variables
                 log "Setting environment variables for CUDA."
@@ -256,14 +278,8 @@ install_nvidia() {
                 _add_to_zshrc "CUDACXX" "/usr/local/cuda-12/bin/nvcc"
                 _add_to_zshrc "CMAKE_ARGS" "\"-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=all-major\""
 
-                # Load the new environment variables
-                source ~/.zshrc
-                
-                # Install TensorRT
-                $INSTALL_CMD tensorrt
-
-                log "CUDA toolkit and environment variables set up successfully for WSL."
-            else
+                log "CUDA, cuDNN, and TensorRT successfully installed and configured for WSL."
+            else                
                 log "Installing NVIDIA components for native Ubuntu."
                 
                 # Add NVIDIA repository
@@ -737,26 +753,26 @@ main() {
     # Detect distribution
     detect_distribution
     
-    # Validate system requirements
+    # # Validate system requirements
     validate_system_requirements
 
-    # Detect GPU
+    # # Detect GPU
     detect_gpu
     
-    # Setup package manager
+    # # Setup package manager
     setup_package_manager
     
-    # Install base packages
-    install_base_packages
+    # # Install base packages
+    # install_base_packages
 
-    # Ensure Zsh is installed and used
-    ensure_zsh
+    # # Ensure Zsh is installed and used
+    # ensure_zsh
     
-    # Install Python
-    install_python
+    # # Install Python
+    # install_python
     
-    # Setup Python environment
-    setup_python_environment
+    # # Setup Python environment
+    # setup_python_environment
     
     # Install NVIDIA components if GPU is present
     if [ "$HAS_GPU" = true ]; then
